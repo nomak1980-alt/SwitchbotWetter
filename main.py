@@ -6,6 +6,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
+APP_DIR = Path(__file__).parent
+
 import pystray
 from PIL import Image, ImageDraw
 
@@ -29,21 +31,19 @@ def _create_tray_icon_image() -> Image.Image:
 
 
 def main() -> None:
-    setup_logging(debug="--debug" in sys.argv)
-
-    try:
-        config = load_config()
-    except ConfigError as exc:
-        logger.error("Konfigurationsfehler: %s", exc)
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror("SwitchBot Wetter — Konfigurationsfehler", str(exc))
-        root.destroy()
-        sys.exit(1)
+    setup_logging(log_path=APP_DIR / "switchbot_wetter.log", debug="--debug" in sys.argv)
 
     root = tk.Tk()
     root.withdraw()
     root.title("SwitchBot Wetter")
+
+    try:
+        config = load_config(APP_DIR / "config.json")
+    except ConfigError as exc:
+        logger.error("Konfigurationsfehler: %s", exc)
+        messagebox.showerror("SwitchBot Wetter — Konfigurationsfehler", str(exc))
+        root.destroy()
+        sys.exit(1)
 
     scanner = BleScanner(config)
     popup = PopupWindow(root)
@@ -63,13 +63,12 @@ def main() -> None:
         scanner.trigger_scan()
 
     def on_settings(icon: pystray.Icon, item: pystray.MenuItem) -> None:
-        config_path = Path("config.json").resolve()
-        os.startfile(str(config_path))
+        os.startfile(str(APP_DIR / "config.json"))
 
     def on_show_log(icon: pystray.Icon, item: pystray.MenuItem) -> None:
-        log_path = Path("switchbot_wetter.log").resolve()
+        log_path = APP_DIR / "switchbot_wetter.log"
         if log_path.exists():
-            os.startfile(str(log_path))
+            os.startfile(str(log_path))  # Windows-only, intentional
         else:
             root.after(0, lambda: messagebox.showinfo(
                 "SwitchBot Wetter", "Noch keine Logdatei vorhanden."
