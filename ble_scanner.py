@@ -56,6 +56,11 @@ class BleScanner:
         with self._lock:
             return self._last_error
 
+    def reload_config(self, config: AppConfig) -> None:
+        self._config = config
+        with self._lock:
+            self._mac_set = {d.mac_address.upper() for d in config.devices}
+
     # --- Internes Threading ---
 
     def _run_loop(self) -> None:

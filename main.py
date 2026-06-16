@@ -48,18 +48,28 @@ def main() -> None:
     scanner = BleScanner(config)
     popup = PopupWindow(root)
 
+    # Mutable Referenz damit on_refresh die Config neu laden kann
+    active_config = [config]
+
     # --- Tray-Callbacks (laufen im pystray-Thread) ---
 
     def _show_popup() -> None:
         readings = scanner.get_readings()
         error = scanner.get_last_error()
-        root.after(0, lambda: popup.show(config.devices, readings, error))
+        devices = active_config[0].devices
+        root.after(0, lambda: popup.show(devices, readings, error))
 
     def on_left_click(icon: pystray.Icon, item: object = None) -> None:
-        scanner.trigger_scan()
         _show_popup()
 
     def on_refresh(icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        try:
+            new_config = load_config(APP_DIR / "config.json")
+            active_config[0] = new_config
+            scanner.reload_config(new_config)
+            logger.info("Config neu geladen — %d Geräte", len(new_config.devices))
+        except ConfigError as exc:
+            logger.error("Config-Reload fehlgeschlagen: %s", exc)
         scanner.trigger_scan()
 
     def on_settings(icon: pystray.Icon, item: pystray.MenuItem) -> None:
@@ -83,6 +93,7 @@ def main() -> None:
     # --- Tray-Icon aufbauen ---
 
     menu = pystray.Menu(
+        pystray.MenuItem("Anzeigen", on_left_click, default=True),
         pystray.MenuItem("Aktualisieren", on_refresh),
         pystray.MenuItem("Einstellungen öffnen", on_settings),
         pystray.MenuItem("Log anzeigen", on_show_log),
@@ -96,7 +107,6 @@ def main() -> None:
         title="SwitchBot Wetter",
         menu=menu,
     )
-    icon.on_activate = on_left_click
 
     # --- Threads starten ---
 
