@@ -75,7 +75,10 @@ def main() -> None:
         root.after(0, lambda: popup.show(devices, readings, error))
 
     def on_left_click(icon: pystray.Icon, item: object = None) -> None:
-        _show_popup()
+        if popup.is_open():
+            root.after(0, popup.close)
+        else:
+            _show_popup()
 
     def on_refresh(icon: pystray.Icon, item: pystray.MenuItem) -> None:
         try:

@@ -113,6 +113,9 @@ class PopupWindow:
 
         self._window = win
 
+    def is_open(self) -> bool:
+        return self._window is not None
+
     def close(self) -> None:
         """Schließt das Popup. Muss im Main-Thread aufgerufen werden."""
         if self._window is not None:
