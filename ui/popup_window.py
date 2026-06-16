@@ -36,12 +36,23 @@ class PopupWindow:
         win.attributes("-topmost", True)
         win.configure(bg=BG)
 
-        # Titelzeile
+        # Titelzeile mit X-Button
+        title_bar = tk.Frame(win, bg=BG)
+        title_bar.pack(fill=tk.X)
         tk.Label(
-            win, text="🌡 SwitchBot Wetter",
+            title_bar, text="🌡 SwitchBot Wetter",
             bg=BG, fg=FG_TITLE, font=("Segoe UI", 11, "bold"),
             padx=14, pady=10,
-        ).pack(fill=tk.X)
+        ).pack(side=tk.LEFT)
+        close_btn = tk.Label(
+            title_bar, text="✕",
+            bg=BG, fg=FG_LABEL, font=("Segoe UI", 11),
+            padx=10, pady=10, cursor="hand2",
+        )
+        close_btn.pack(side=tk.RIGHT)
+        close_btn.bind("<Button-1>", lambda e: self.close())
+        close_btn.bind("<Enter>", lambda e: close_btn.configure(fg=FG_TITLE))
+        close_btn.bind("<Leave>", lambda e: close_btn.configure(fg=FG_LABEL))
         tk.Frame(win, bg=SEPARATOR, height=1).pack(fill=tk.X)
 
         if error and not readings:
