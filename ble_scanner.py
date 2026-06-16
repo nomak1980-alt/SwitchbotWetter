@@ -40,7 +40,10 @@ class BleScanner:
     def trigger_scan(self) -> None:
         if self._loop is None or not self._loop.is_running():
             return
-        asyncio.run_coroutine_threadsafe(self._scan_burst(), self._loop)
+        fut = asyncio.run_coroutine_threadsafe(self._scan_burst(), self._loop)
+        fut.add_done_callback(
+            lambda f: logger.exception("trigger_scan Fehler") if f.exception() else None
+        )
 
     def get_readings(self) -> dict[str, SensorReading]:
         with self._lock:
