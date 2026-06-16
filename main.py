@@ -51,6 +51,21 @@ def main() -> None:
     # Mutable Referenz damit on_refresh die Config neu laden kann
     active_config = [config]
 
+    # --- Tooltip-Update ---
+
+    def _update_tooltip(icon_ref: list) -> None:
+        readings = scanner.get_readings()
+        devices = active_config[0].devices
+        if not readings:
+            return
+        lines = []
+        for d in devices:
+            r = readings.get(d.mac_address.upper())
+            if r:
+                lines.append(f"{d.name}: {r.temperature:.1f}°C  {r.humidity}%")
+        if lines and icon_ref:
+            icon_ref[0].title = "\n".join(lines)
+
     # --- Tray-Callbacks (laufen im pystray-Thread) ---
 
     def _show_popup() -> None:
@@ -101,12 +116,15 @@ def main() -> None:
         pystray.MenuItem("Beenden", on_quit),
     )
 
+    icon_ref: list = []
     icon = pystray.Icon(
         name="switchbot_wetter",
         icon=_create_tray_icon_image(),
         title="SwitchBot Wetter",
         menu=menu,
     )
+    icon_ref.append(icon)
+    scanner.set_update_callback(lambda: _update_tooltip(icon_ref))
 
     # --- Threads starten ---
 

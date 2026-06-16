@@ -25,6 +25,10 @@ class BleScanner:
         self._last_error: str | None = None
         self._backoff: float = 1.0
         self._loop_ready = threading.Event()
+        self._on_update: "Callable[[], None] | None" = None
+
+    def set_update_callback(self, callback: "Callable[[], None]") -> None:
+        self._on_update = callback
 
     def start(self) -> None:
         self._loop = asyncio.new_event_loop()
@@ -124,3 +128,5 @@ class BleScanner:
             if reading.battery is None and existing is not None and existing.battery is not None:
                 reading = dataclasses.replace(reading, battery=existing.battery)
             self._cache[mac] = reading
+        if self._on_update:
+            self._on_update()

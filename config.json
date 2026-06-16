@@ -1,7 +1,8 @@
 {
   "devices": [
-    {"name": "Wohnzimmer", "macAddress": "AA:BB:CC:DD:EE:FF"},
-    {"name": "Terrasse",   "macAddress": "11:22:33:44:55:66"}
+	{"name": "Außen Hinten",   "macAddress": "EC:2E:85:06:68:71"},
+    {"name": "Außen Vorne",   "macAddress": "EC:2E:84:86:41:0D"},
+	{"name": "Büro", "macAddress": "ED:2E:86:06:66:8D"}
   ],
   "scan_interval_seconds": 300,
   "scan_duration_seconds": 10

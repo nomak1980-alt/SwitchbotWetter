@@ -111,27 +111,13 @@ class PopupWindow:
         y = sh - h - 50
         win.geometry(f"{w}x{h}+{x}+{y}")
 
-        # Schließen bei Klick außerhalb
-        win.focus_force()
-        win.grab_set()
-        win.bind("<Button-1>", lambda e: self._on_click(win, e))
-
         self._window = win
 
     def close(self) -> None:
         """Schließt das Popup. Muss im Main-Thread aufgerufen werden."""
         if self._window is not None:
             try:
-                self._window.grab_release()
                 self._window.destroy()
             except tk.TclError:
                 pass
             self._window = None
-
-    def _on_click(self, win: tk.Toplevel, event: tk.Event) -> None:
-        wx = win.winfo_rootx()
-        wy = win.winfo_rooty()
-        ww = win.winfo_width()
-        wh = win.winfo_height()
-        if not (wx <= event.x_root <= wx + ww and wy <= event.y_root <= wy + wh):
-            self.close()
