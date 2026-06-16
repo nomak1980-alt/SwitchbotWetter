@@ -24,6 +24,7 @@ class BleScanner:
         self._periodic_task: asyncio.Task | None = None
         self._last_error: str | None = None
         self._backoff: float = 1.0
+        self._loop_ready = threading.Event()
 
     def start(self) -> None:
         self._loop = asyncio.new_event_loop()
@@ -33,6 +34,7 @@ class BleScanner:
     def stop(self) -> None:
         if self._loop is None:
             return
+        self._loop_ready.wait(timeout=5.0)
         if self._periodic_task is not None:
             self._loop.call_soon_threadsafe(self._periodic_task.cancel)
         self._loop.call_soon_threadsafe(self._loop.stop)
@@ -42,7 +44,8 @@ class BleScanner:
             return
         fut = asyncio.run_coroutine_threadsafe(self._scan_burst(), self._loop)
         fut.add_done_callback(
-            lambda f: logger.exception("trigger_scan Fehler") if f.exception() else None
+            lambda f: logger.error("trigger_scan Fehler: %s", f.exception(), exc_info=f.exception())
+            if f.exception() else None
         )
 
     def get_readings(self) -> dict[str, SensorReading]:
@@ -60,6 +63,7 @@ class BleScanner:
         self._loop.run_until_complete(self._main())
 
     async def _main(self) -> None:
+        self._loop_ready.set()
         await self._scan_burst()
         self._periodic_task = asyncio.create_task(self._periodic_scan())
         try:
@@ -77,7 +81,6 @@ class BleScanner:
         try:
             scanner = BleakScanner(
                 detection_callback=self._advertisement_callback,
-                scanning_mode="active",
             )
             await scanner.start()
             try:
