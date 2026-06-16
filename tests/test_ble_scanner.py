@@ -7,7 +7,7 @@ from device_parser import SWITCHBOT_COMPANY_ID, SWITCHBOT_SERVICE_UUID
 MAC_A = "AA:BB:CC:DD:EE:FF"
 MAC_B = "11:22:33:44:55:66"
 
-def _make_config(macs: list[str] = None) -> AppConfig:
+def _make_config(macs: list[str] | None = None) -> AppConfig:
     macs = macs or [MAC_A]
     return AppConfig(
         devices=[DeviceConfig(name=f"Sensor{i}", mac_address=m) for i, m in enumerate(macs)],

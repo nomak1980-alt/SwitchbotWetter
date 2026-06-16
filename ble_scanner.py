@@ -2,7 +2,6 @@ import asyncio
 import dataclasses
 import logging
 import threading
-from collections.abc import Callable
 
 from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
@@ -78,8 +77,10 @@ class BleScanner:
                 scanning_mode="active",
             )
             await scanner.start()
-            await asyncio.sleep(self._config.scan_duration_seconds)
-            await scanner.stop()
+            try:
+                await asyncio.sleep(self._config.scan_duration_seconds)
+            finally:
+                await scanner.stop()
             with self._lock:
                 self._last_error = None
             self._backoff = 1.0
