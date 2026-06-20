@@ -45,14 +45,20 @@ python -m py_compile main.py
 - Service Data UUID `0000fd3d-...`: `[2]&0x7F` = Batterie
 
 **`ble_scanner.py`** — besitzt den asyncio-Loop und `threading.Event` (`_loop_ready`) damit `stop()` nicht vor Loop-Start feuert. `_advertisement_callback` läuft im asyncio-Thread; schreibt in Cache unter Lock. Battery-Merge: fehlt Service Data in neuem Advertisement, wird Batterie aus vorherigem Cache-Eintrag übernommen (`dataclasses.replace`). `set_update_callback()` wird nach jedem Cache-Update aufgerufen (für Tooltip-Updates).
+- **Zwei Scan-Modi** (`config.scan_mode`): `"continuous"` (PC-Default) → `_continuous_scan()` hält den Scanner dauerhaft an und startet ihn nur alle `scan_interval_seconds` kurz neu (gegen WinRT-„Einschlafen"); maximale Empfangschance für schwache/entfernte Sensoren. `"interval"` → `_scan_burst()` + `_periodic_scan()`: sparsamer Burst (`scan_duration_seconds` lang) je `scan_interval_seconds`, dazwischen Funk aus — das Muster für die geplante ESP32-Portierung (Deep-Sleep).
+- `_advertisement_callback` loggt `advertisement.rssi` (Signalstärke in dBm) auf DEBUG — nur sichtbar mit `--debug`, nicht über `start.vbs`. Diagnose für „weit entfernte Sensoren kommen nicht an".
 
 **`main.py`** — `active_config = [config]` ist ein List-Wrapper damit `on_refresh` die Config-Referenz ersetzen kann ohne Closure-Probleme. `icon_ref = [icon]` analog für den Tooltip-Callback. `APP_DIR = Path(__file__).parent` — alle Pfade (config.json, log) relativ zum Skriptverzeichnis, nicht zum CWD.
 
-**`ui/popup_window.py`** — `show()` und `close()` dürfen nur im Main-Thread aufgerufen werden. `is_open()` ist thread-safe (liest nur `_window is not None`). Kein `grab_set()` — Popup bleibt offen bis ✕ oder erneuter Tray-Klick.
+**`ui/popup_window.py`** — `show()`, `update_data()` und `close()` dürfen nur im Main-Thread aufgerufen werden. `is_open()` ist thread-safe (liest nur `_window is not None`). Kein `grab_set()` — Popup bleibt offen bis ✕ oder erneuter Tray-Klick.
+- `show()` baut das Fenster neu auf und speichert Label-Referenzen in `_device_labels` (MAC → `{temp, info}`) sowie die Menge `_macs_with_data`.
+- `update_data()` aktualisiert Labels in-place ohne Fenster-Neuaufbau (kein Flicker). Einzige Ausnahme: ändert sich `_macs_with_data` (Sensor erstmals empfangen), ruft es `show()` auf.
+- Jeder Sensor zeigt Batterie + Timestamp in einer Zeile (`_info_text()`). Es gibt keinen globalen Footer-Timestamp mehr.
+- `_on_scanner_update()` in `main.py` ruft nach jedem BLE-Cache-Update sowohl `_update_tooltip()` als auch (wenn Popup offen) `popup.update_data()` via `root.after(0, ...)` auf — so aktualisiert sich das Panel live.
 
 ## BLE-Hinweis
 
-`scanning_mode="active"` ist auf Windows/WinRT nicht unterstützt — nicht wieder hinzufügen. SwitchBot-Sensoren senden passiv; aktiver Scan ist nicht nötig. Kein `service_uuids`-Filter setzen: WinRT liefert sonst nur Advertisement *oder* Scan-Response, nicht beides (Temp und Batterie wären in verschiedenen Paketen).
+`scanning_mode="active"` läuft auf WinRT fehlerfrei (2026-06-20 empirisch verifiziert), bringt hier aber nichts: SwitchBot liefert Temp+Batterie bereits im passiven Advertisement, und Sensoren die gerade nicht broadcasten reagieren auch auf aktiven Scan nicht (active vs. passive = identisch). Passiv lassen. Kein `service_uuids`-Filter setzen: WinRT liefert sonst nur Advertisement *oder* Scan-Response, nicht beides (Temp und Batterie wären in verschiedenen Paketen).
 
 ## Konfiguration zur Laufzeit ändern
 

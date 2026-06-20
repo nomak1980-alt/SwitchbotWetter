@@ -59,3 +59,22 @@ def test_custom_scan_params(tmp_path):
     config = load_config(path)
     assert config.scan_interval_seconds == 60
     assert config.scan_duration_seconds == 5
+
+
+def test_defaults_scan_mode_continuous(tmp_path):
+    """Ohne Angabe ist die PC-Variante (Dauerscan) der Default."""
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"devices": []}), encoding="utf-8")
+    config = load_config(path)
+    assert config.scan_mode == "continuous"
+
+
+def test_custom_scan_mode_interval(tmp_path):
+    """ESP32-Variante: sparsamer Burst-Scan per Intervall."""
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({
+        "devices": [],
+        "scan_mode": "interval",
+    }), encoding="utf-8")
+    config = load_config(path)
+    assert config.scan_mode == "interval"

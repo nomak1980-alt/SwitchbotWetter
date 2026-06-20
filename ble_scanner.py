@@ -73,8 +73,13 @@ class BleScanner:
 
     async def _main(self) -> None:
         self._loop_ready.set()
-        await self._scan_burst()
-        self._periodic_task = asyncio.create_task(self._periodic_scan())
+        if self._config.scan_mode == "interval":
+            # ESP32-Variante: sparsamer Burst-Scan, dazwischen Funk aus
+            await self._scan_burst()
+            self._periodic_task = asyncio.create_task(self._periodic_scan())
+        else:
+            # PC-Variante: Funk dauerhaft an, maximale Empfangschance
+            self._periodic_task = asyncio.create_task(self._continuous_scan())
         try:
             await self._periodic_task
         except asyncio.CancelledError:
@@ -84,6 +89,33 @@ class BleScanner:
         while True:
             await asyncio.sleep(self._config.scan_interval_seconds)
             await self._scan_burst()
+
+    async def _continuous_scan(self) -> None:
+        """PC-Variante: Scanner dauerhaft aktiv. Alle scan_interval_seconds kurz
+        neu starten, damit der WinRT-Scanner nicht 'einschläft'. Der Cache wird
+        die ganze Zeit live über _advertisement_callback aktualisiert."""
+        logger.info(
+            "BLE-Dauerscan gestartet (Scanner-Refresh alle %ds)",
+            self._config.scan_interval_seconds,
+        )
+        while True:
+            try:
+                scanner = BleakScanner(detection_callback=self._advertisement_callback)
+                await scanner.start()
+                try:
+                    await asyncio.sleep(self._config.scan_interval_seconds)
+                finally:
+                    await scanner.stop()
+                with self._lock:
+                    self._last_error = None
+                self._backoff = 1.0
+            except Exception as exc:
+                error_msg = str(exc)
+                with self._lock:
+                    self._last_error = f"BLE-Fehler: {error_msg}"
+                logger.exception("BLE-Dauerscan-Fehler, Retry in %.0fs", self._backoff)
+                await asyncio.sleep(self._backoff)
+                self._backoff = min(self._backoff * 2, 60.0)
 
     async def _scan_burst(self) -> None:
         logger.info("BLE-Scan gestartet (Dauer: %ds)", self._config.scan_duration_seconds)
@@ -115,8 +147,9 @@ class BleScanner:
         if mac not in self._mac_set:
             return
         logger.debug(
-            "Advertisement von %s: mfr=%s svc=%s",
+            "Advertisement von %s (RSSI %s dBm): mfr=%s svc=%s",
             mac,
+            advertisement.rssi,
             dict(advertisement.manufacturer_data),
             dict(advertisement.service_data),
         )

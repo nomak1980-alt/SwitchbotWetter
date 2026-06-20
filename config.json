@@ -5,5 +5,6 @@
 	{"name": "Büro", "macAddress": "ED:2E:86:06:66:8D"}
   ],
   "scan_interval_seconds": 300,
-  "scan_duration_seconds": 10
+  "scan_duration_seconds": 10,
+  "scan_mode": "continuous"
 }

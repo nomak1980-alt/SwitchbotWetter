@@ -12,8 +12,8 @@ Windows-Tray-Anwendung zum Auslesen von SwitchBot Outdoor Meter / Hygrometer-Sen
 - Kein SwitchBot Hub, kein Cloud-Account, kein Bluetooth-Pairing nötig
 - Minimiert im Windows-Infobereich (System Tray)
 - Hover über das Tray-Icon zeigt aktuelle Temperatur und Luftfeuchtigkeit aller Sensoren
-- Klick auf das Tray-Icon öffnet/schließt ein Popup mit allen Messwerten
-- Automatische Aktualisierung alle 5 Minuten
+- Klick auf das Tray-Icon öffnet/schließt ein Popup mit allen Messwerten (aktualisiert sich live)
+- Zwei Scan-Modi: Dauerscan (bester Empfang am PC) oder sparsamer Intervall-Scan (für ESP32-Portierung)
 - Konfiguration per einfacher JSON-Datei
 
 ---
@@ -49,9 +49,16 @@ pip install -r requirements.txt
     {"name": "Keller",     "macAddress": "22:33:44:55:66:77"}
   ],
   "scan_interval_seconds": 300,
-  "scan_duration_seconds": 10
+  "scan_duration_seconds": 10,
+  "scan_mode": "continuous"
 }
 ```
+
+| Feld | Bedeutung |
+|------|-----------|
+| `scan_mode` | `"continuous"` (Standard, PC): Funk dauerhaft an, bester Empfang. `"interval"`: sparsamer Burst-Scan — für die geplante ESP32-Portierung (Deep-Sleep). |
+| `scan_interval_seconds` | `interval`-Modus: Pause zwischen den Scans. `continuous`-Modus: Intervall, in dem der Scanner neu gestartet wird (gegen WinRT-Hänger). |
+| `scan_duration_seconds` | Nur `interval`-Modus: Dauer eines Scan-Bursts. |
 
 **MAC-Adresse ermitteln:** SwitchBot-App → Gerät auswählen → Einstellungen → Geräteinformationen, oder mit einer BLE-Scanner-App wie [nRF Connect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile).
 
@@ -98,22 +105,35 @@ python main.py --debug
 ## Popup
 
 ```
-┌─────────────────────────────┐
-│  🌡 SwitchBot Wetter      ✕ │
-├─────────────────────────────┤
-│  Außen Hinten               │
-│  18,1 °C  •  65 %          │
-│  Batterie: 85 %             │
-│                             │
-│  Außen Vorne                │
-│  17,8 °C  •  68 %          │
-│                             │
-│  Büro                       │
-│  22,3 °C  •  48 %          │
-├─────────────────────────────┤
-│  Aktualisiert: 14:32:07     │
-└─────────────────────────────┘
+┌──────────────────────────────────┐
+│  🌡 SwitchBot Wetter           ✕ │
+├──────────────────────────────────┤
+│  Außen Hinten                    │
+│  18,1 °C  •  65 %               │
+│  Batterie: 85 %  •  14:32:07     │
+│                                  │
+│  Außen Vorne                     │
+│  17,8 °C  •  68 %               │
+│  Batterie: 90 %  •  14:31:54     │
+│                                  │
+│  Büro                            │
+│  22,3 °C  •  48 %               │
+│  Batterie: 78 %  •  14:32:05     │
+└──────────────────────────────────┘
 ```
+
+Jeder Sensor zeigt Batterie und Empfangszeitpunkt in einer Zeile. Das Panel aktualisiert sich live, solange es offen ist.
+
+---
+
+## Empfang & Reichweite
+
+BLE funkt auf 2,4 GHz und wird durch Wände, Metall und Distanz stark gedämpft. Weit entfernte Sensoren kommen daher u. U. nur selten oder gar nicht an — das ist ein **Funkstrecken-/Positionsproblem**, kein Software-Problem (auch ein Handy hat am selben ungünstigen Standort schlechten Empfang).
+
+- **Diagnose:** `python main.py --debug` starten und im Log die `RSSI`-Werte pro Sensor prüfen. Faustregel: > −80 dBm gut, −80…−90 dBm grenzwertig, < −90 dBm kaum empfangbar.
+- **`scan_mode: "continuous"`** holt das Maximum aus dem heraus, was ankommt (Funk dauerhaft an).
+- **Bester Hebel bei schlechtem Empfang:** den BLE-Empfänger näher an die Sensoren bringen — z. B. ein USB-BLE-Dongle per Verlängerungskabel ans Fenster. Eingebaute Combo-WLAN/BT-Chips haben oft schwache Antennen.
+- **Alternative:** ein SwitchBot Hub (zentral platziert) als Gateway; die Werte werden dann über die SwitchBot Cloud-API statt direkt per BLE abgefragt.
 
 ---
 
@@ -184,7 +204,7 @@ Alle tkinter-Zugriffe aus dem pystray-Thread laufen über `root.after(0, ...)`.
 pytest -v
 ```
 
-24 Unit-Tests für Parser, Config-Service und Scanner-Logik. BLE-Hardware nicht erforderlich.
+26 Unit-Tests für Parser, Config-Service und Scanner-Logik. BLE-Hardware nicht erforderlich.
 
 ---
 

@@ -18,6 +18,8 @@ class AppConfig:
     devices: list[DeviceConfig]
     scan_interval_seconds: int = 300
     scan_duration_seconds: int = 10
+    # "continuous" = PC-Variante (Dauerscan), "interval" = ESP32-Variante (Burst je Intervall)
+    scan_mode: str = "continuous"
 
 
 def load_config(path: Path = Path("config.json")) -> AppConfig:
@@ -32,10 +34,14 @@ def load_config(path: Path = Path("config.json")) -> AppConfig:
         DeviceConfig(name=d["name"], mac_address=d["macAddress"])
         for d in data.get("devices", [])
     ]
+    scan_mode = str(data.get("scan_mode", "continuous")).lower()
+    if scan_mode not in ("continuous", "interval"):
+        scan_mode = "continuous"
     return AppConfig(
         devices=devices,
         scan_interval_seconds=int(data.get("scan_interval_seconds", 300)),
         scan_duration_seconds=int(data.get("scan_duration_seconds", 10)),
+        scan_mode=scan_mode,
     )
 
 
@@ -47,5 +53,6 @@ def _create_example_config(path: Path) -> None:
         ],
         "scan_interval_seconds": 300,
         "scan_duration_seconds": 10,
+        "scan_mode": "continuous",
     }
     path.write_text(json.dumps(example, indent=2, ensure_ascii=False), encoding="utf-8")
