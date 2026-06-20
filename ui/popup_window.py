@@ -11,7 +11,6 @@ FG_VALUE = "#ffffff"
 FG_BATTERY = "#777777"
 FG_NODATA = "#555555"
 FG_ERROR = "#e74c3c"
-FG_FOOTER = "#666666"
 SEPARATOR = "#444444"
 
 
@@ -19,6 +18,8 @@ class PopupWindow:
     def __init__(self, root: tk.Tk) -> None:
         self._root = root
         self._window: tk.Toplevel | None = None
+        self._device_labels: dict[str, dict] = {}
+        self._macs_with_data: set[str] = set()
 
     def show(
         self,
@@ -30,6 +31,9 @@ class PopupWindow:
         if self._window is not None:
             self._window.destroy()
             self._window = None
+
+        self._device_labels = {}
+        self._macs_with_data = set()
 
         win = tk.Toplevel(self._root)
         win.wm_overrideredirect(True)
@@ -72,34 +76,27 @@ class PopupWindow:
                     bg=BG, fg=FG_LABEL, font=("Segoe UI", 9),
                 ).pack(anchor=tk.W)
                 if reading is not None:
-                    temp_str = f"{reading.temperature:.1f} °C  •  {reading.humidity} %"
-                    tk.Label(
-                        frame, text=temp_str,
+                    self._macs_with_data.add(mac)
+                    temp_label = tk.Label(
+                        frame, text=f"{reading.temperature:.1f} °C  •  {reading.humidity} %",
                         bg=BG, fg=FG_VALUE, font=("Segoe UI", 14, "bold"),
-                    ).pack(anchor=tk.W)
-                    if reading.battery is not None:
-                        tk.Label(
-                            frame, text=f"Batterie: {reading.battery} %",
-                            bg=BG, fg=FG_BATTERY, font=("Segoe UI", 8),
-                        ).pack(anchor=tk.W)
+                    )
+                    temp_label.pack(anchor=tk.W)
+                    info_label = tk.Label(
+                        frame, text=self._info_text(reading),
+                        bg=BG, fg=FG_BATTERY, font=("Segoe UI", 8),
+                    )
+                    info_label.pack(anchor=tk.W)
+                    self._device_labels[mac] = {"temp": temp_label, "info": info_label}
                 else:
-                    tk.Label(
+                    nodata_label = tk.Label(
                         frame, text="— keine Daten —",
                         bg=BG, fg=FG_NODATA, font=("Segoe UI", 10),
-                    ).pack(anchor=tk.W)
+                    )
+                    nodata_label.pack(anchor=tk.W)
+                    self._device_labels[mac] = {"nodata": nodata_label}
 
-        # Fußzeile
         tk.Frame(win, bg=SEPARATOR, height=1).pack(fill=tk.X)
-        last_ts = max((r.timestamp for r in readings.values()), default=None)
-        if last_ts:
-            ts_text = f"Aktualisiert: {last_ts.strftime('%H:%M:%S')}"
-        else:
-            ts_text = "Noch nicht aktualisiert"
-        tk.Label(
-            win, text=ts_text,
-            bg=BG, fg=FG_FOOTER, font=("Segoe UI", 8),
-            padx=14, pady=6,
-        ).pack(fill=tk.X)
 
         # Positionieren: rechts unten
         win.update_idletasks()
@@ -112,6 +109,40 @@ class PopupWindow:
         win.geometry(f"{w}x{h}+{x}+{y}")
 
         self._window = win
+
+    def update_data(
+        self,
+        devices: list[DeviceConfig],
+        readings: dict[str, SensorReading],
+        error: str | None = None,
+    ) -> None:
+        """Aktualisiert Messwerte im offenen Popup ohne Neuaufbau. Muss im Main-Thread aufgerufen werden."""
+        if self._window is None:
+            return
+
+        new_macs_with_data = {
+            d.mac_address.upper() for d in devices
+            if readings.get(d.mac_address.upper()) is not None
+        }
+        if new_macs_with_data != self._macs_with_data:
+            # Struktur hat sich geändert (z.B. Sensor erstmals empfangen) → neu aufbauen
+            self.show(devices, readings, error)
+            return
+
+        for device in devices:
+            mac = device.mac_address.upper()
+            reading = readings.get(mac)
+            labels = self._device_labels.get(mac)
+            if labels is None or reading is None:
+                continue
+            labels["temp"].configure(text=f"{reading.temperature:.1f} °C  •  {reading.humidity} %")
+            labels["info"].configure(text=self._info_text(reading))
+
+    def _info_text(self, reading: SensorReading) -> str:
+        ts = reading.timestamp.strftime("%H:%M:%S")
+        if reading.battery is not None:
+            return f"Batterie: {reading.battery} %  •  {ts}"
+        return ts
 
     def is_open(self) -> bool:
         return self._window is not None

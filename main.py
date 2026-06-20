@@ -127,7 +127,15 @@ def main() -> None:
         menu=menu,
     )
     icon_ref.append(icon)
-    scanner.set_update_callback(lambda: _update_tooltip(icon_ref))
+    def _on_scanner_update() -> None:
+        _update_tooltip(icon_ref)
+        if popup.is_open():
+            readings = scanner.get_readings()
+            error = scanner.get_last_error()
+            devices = active_config[0].devices
+            root.after(0, lambda: popup.update_data(devices, readings, error))
+
+    scanner.set_update_callback(_on_scanner_update)
 
     # --- Threads starten ---
 
